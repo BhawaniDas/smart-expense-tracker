@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Ledger Pro — Smart personal finance tracker" />
+  <title>Ledger Pro</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <!-- Firebase (v9 compat CDN — easiest drop-in for static hosting) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ============================================================
+       AUTH SCREEN
+  ============================================================ -->
+  <div id="authScreen" class="auth-screen">
+    <div class="auth-bg">
+      <div class="auth-orb orb-1"></div>
+      <div class="auth-orb orb-2"></div>
+      <div class="auth-orb orb-3"></div>
+    </div>
+    <div class="auth-card glass">
+      <div class="auth-logo">
+        <div class="logo-mark">₹</div>
+        <span>Ledger Pro</span>
+      </div>
+      <p class="auth-tagline">Your finances, beautifully organised.</p>
+
+      <!-- Tab switcher -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login">Sign In</button>
+        <button class="auth-tab" data-tab="signup">Sign Up</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="loginForm" class="auth-form active" novalidate>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="form-input" id="loginEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input class="form-input" id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password" />
+        </div>
+        <button class="btn btn-primary btn-full" type="submit" id="loginBtn">
+          <span class="btn-text">Sign In</span>
+          <span class="btn-loader hidden">⟳</span>
+        </button>
+        <p class="auth-switch">Don't have an account? <a href="#" data-tab="signup">Sign Up</a></p>
+      </form>
+
+      <!-- Signup Form -->
+      <form id="signupForm" class="auth-form" novalidate>
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input class="form-input" id="signupName" type="text" placeholder="Your Name" autocomplete="name" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="form-input" id="signupEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input class="form-input" id="signupPassword" type="password" placeholder="Min 6 characters" autocomplete="new-password" />
+        </div>
+        <button class="btn btn-primary btn-full" type="submit" id="signupBtn">
+          <span class="btn-text">Create Account</span>
+          <span class="btn-loader hidden">⟳</span>
+        </button>
+        <p class="auth-switch">Already have an account? <a href="#" data-tab="login">Sign In</a></p>
+      </form>
+
+      <!-- Demo / Guest -->
+      <div class="auth-divider"><span>or</span></div>
+      <button class="btn btn-ghost btn-full" id="guestBtn">Continue as Guest (Demo)</button>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       MAIN APP (hidden until auth)
+  ============================================================ -->
+  <div id="appScreen" class="app-screen hidden">
+
+    <!-- HEADER -->
+    <header class="header glass">
+      <div class="header-left">
+        <button class="btn-icon mobile-only" id="menuToggle" aria-label="Menu">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect y="3" width="18" height="2" rx="1" fill="currentColor"/><rect y="8" width="18" height="2" rx="1" fill="currentColor"/><rect y="13" width="18" height="2" rx="1" fill="currentColor"/></svg>
+        </button>
+        <div class="logo">
+          <div class="logo-mark">₹</div>
+          <span class="logo-text">Ledger Pro</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="btn btn-primary btn-sm" id="headerAddBtn">+ Add Transaction</button>
+        <button class="btn-icon" id="exportBtn" title="Export CSV" aria-label="Export CSV">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 10L5 7h2V3h2v4h2L8 10z" fill="currentColor"/><path d="M3 12h10v1H3v-1z" fill="currentColor"/></svg>
+        </button>
+        <button class="btn-icon" id="themeToggle" aria-label="Toggle theme">
+          <span id="themeIcon">🌙</span>
+        </button>
+        <div class="user-avatar" id="userAvatar" title="Account">
+          <span id="userInitial">?</span>
+        </div>
+        <button class="btn-icon" id="logoutBtn" title="Sign Out" aria-label="Sign out">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 2H2v12h4v-1H3V3h3V2z" fill="currentColor"/><path d="M10.5 5l3 3-3 3-.7-.7L11.6 8.5H5v-1h6.6L10.5 5.7l.7-.7z" fill="currentColor" transform="translate(-1,0)"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <!-- SIDEBAR -->
+      <aside class="sidebar glass" id="sidebar">
+        <nav class="sidebar-nav">
+          <div class="nav-section-label">Overview</div>
+          <a class="nav-item active" data-view="dashboard" href="#">
+            <span class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity=".7"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".7"/></svg>
+            </span>
+            Dashboard
+          </a>
+          <a class="nav-item" data-view="transactions" href="#">
+            <span class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </span>
+            Transactions
+          </a>
+
+          <div class="nav-section-label">Analytics</div>
+          <a class="nav-item" data-view="analytics" href="#">
+            <span class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 13l4-4 3 3 4-5 3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            Analytics
+          </a>
+          <a class="nav-item" data-view="budget" href="#">
+            <span class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 4v4l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </span>
+            Budget
+          </a>
+
+          <div class="nav-section-label">Tools</div>
+          <a class="nav-item" href="#" id="sidebarExport">
+            <span class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 10L5 7h2V3h2v4h2L8 10z" fill="currentColor"/><path d="M3 12h10v1H3v-1z" fill="currentColor"/></svg>
+            </span>
+            Export CSV
+          </a>
+        </nav>
+
+        <!-- Sidebar Budget Mini -->
+        <div class="sidebar-budget-mini" id="sidebarBudgetMini">
+          <div class="sbm-label">Monthly Budget</div>
+          <div class="sbm-track">
+            <div class="sbm-fill" id="sbmFill"></div>
+          </div>
+          <div class="sbm-nums" id="sbmNums">—</div>
+        </div>
+      </aside>
+
+      <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+      <!-- MAIN CONTENT -->
+      <main class="main-content">
+
+        <!-- ── DASHBOARD VIEW ─────────────────────────── -->
+        <section class="view active" id="view-dashboard">
+
+          <!-- Stats strip -->
+          <div class="stats-grid" id="statsGrid">
+            <div class="stat-card stat-balance">
+              <div class="stat-header">
+                <span class="stat-label">Net Balance</span>
+                <span class="stat-badge badge-blue">Live</span>
+              </div>
+              <div class="stat-value" id="statBalance">₹0.00</div>
+              <div class="stat-meta" id="statBalanceMeta">0 transactions total</div>
+              <div class="stat-chart-mini" id="balanceSparkline"></div>
+            </div>
+            <div class="stat-card stat-income">
+              <div class="stat-header">
+                <span class="stat-label">Total Income</span>
+                <span class="stat-badge badge-green">+</span>
+              </div>
+              <div class="stat-value income-val" id="statIncome">₹0.00</div>
+              <div class="stat-meta" id="statIncomeMeta">0 entries</div>
+            </div>
+            <div class="stat-card stat-expense">
+              <div class="stat-header">
+                <span class="stat-label">Total Expenses</span>
+                <span class="stat-badge badge-red">−</span>
+              </div>
+              <div class="stat-value expense-val" id="statExpense">₹0.00</div>
+              <div class="stat-meta" id="statExpenseMeta">0 entries</div>
+            </div>
+          </div>
+
+          <!-- Budget warning -->
+          <div class="budget-alert hidden" id="budgetAlert"></div>
+
+          <!-- Insights row -->
+          <div class="section-header">
+            <h2 class="section-title">Smart Insights</h2>
+          </div>
+          <div class="insights-row" id="insightsRow">
+            <div class="insight-tile">
+              <div class="insight-icon">🏆</div>
+              <div class="insight-body">
+                <div class="insight-label">Top Spend</div>
+                <div class="insight-value" id="insTopCat">—</div>
+                <div class="insight-sub" id="insTopCatAmt"></div>
+              </div>
+            </div>
+            <div class="insight-tile">
+              <div class="insight-icon">📅</div>
+              <div class="insight-body">
+                <div class="insight-label">Daily Avg (this month)</div>
+                <div class="insight-value" id="insDailyAvg">₹0</div>
+              </div>
+            </div>
+            <div class="insight-tile">
+              <div class="insight-icon">🔥</div>
+              <div class="insight-body">
+                <div class="insight-label">Biggest Single</div>
+                <div class="insight-value" id="insBiggest">—</div>
+                <div class="insight-sub" id="insBiggestName"></div>
+              </div>
+            </div>
+            <div class="insight-tile">
+              <div class="insight-icon">💹</div>
+              <div class="insight-body">
+                <div class="insight-label">Savings Rate</div>
+                <div class="insight-value" id="insSavings">0%</div>
+                <div class="insight-sub">of income</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Transactions -->
+          <div class="section-header">
+            <h2 class="section-title">Recent Transactions</h2>
+            <button class="btn btn-ghost btn-sm" onclick="App.switchView('transactions')">View All →</button>
+          </div>
+          <div class="tx-list" id="recentList"></div>
+        </section>
+
+        <!-- ── TRANSACTIONS VIEW ──────────────────────── -->
+        <section class="view" id="view-transactions">
+          <div class="section-header">
+            <h2 class="section-title">All Transactions</h2>
+            <button class="btn btn-primary btn-sm" id="txAddBtn">+ Add</button>
+          </div>
+
+          <div class="filter-bar glass">
+            <div class="search-wrap">
+              <svg class="search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <input class="form-input search-input" id="searchInput" placeholder="Search transactions…" type="text" />
+            </div>
+            <select class="form-select filter-select" id="filterCat">
+              <option value="">All Categories</option>
+              <option value="Food">🍔 Food</option>
+              <option value="Travel">✈️ Travel</option>
+              <option value="Bills">⚡ Bills</option>
+              <option value="Shopping">🛍️ Shopping</option>
+              <option value="Health">🏥 Health</option>
+              <option value="Entertainment">🎬 Entertainment</option>
+              <option value="Salary">💼 Salary</option>
+              <option value="Freelance">💻 Freelance</option>
+              <option value="Investment">📈 Investment</option>
+              <option value="Other">📦 Other</option>
+            </select>
+            <select class="form-select filter-select" id="filterType">
+              <option value="">All Types</option>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+            <input class="form-input filter-date" id="filterFrom" type="date" title="From" />
+            <input class="form-input filter-date" id="filterTo" type="date" title="To" />
+            <button class="btn btn-ghost btn-sm" id="clearFiltersBtn">✕ Clear</button>
+          </div>
+
+          <div class="tx-list" id="allTxList"></div>
+          <div class="pagination" id="pagination">
+            <span class="page-info" id="pageInfo">—</span>
+            <div class="page-btns">
+              <button class="btn btn-ghost btn-sm" id="prevPage">← Prev</button>
+              <button class="btn btn-ghost btn-sm" id="nextPage">Next →</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── ANALYTICS VIEW ────────────────────────── -->
+        <section class="view" id="view-analytics">
+          <div class="section-header">
+            <h2 class="section-title">Analytics</h2>
+            <div class="period-chips" id="periodChips">
+              <button class="chip active" data-period="3">3M</button>
+              <button class="chip" data-period="6">6M</button>
+              <button class="chip" data-period="12">1Y</button>
+            </div>
+          </div>
+          <div class="charts-grid">
+            <div class="chart-card glass full-width">
+              <div class="chart-card-header">Monthly Income vs Expenses</div>
+              <canvas id="chartMonthly" height="90"></canvas>
+            </div>
+            <div class="chart-card glass">
+              <div class="chart-card-header">Expense by Category</div>
+              <canvas id="chartCat" height="220"></canvas>
+            </div>
+            <div class="chart-card glass">
+              <div class="chart-card-header">Income Sources</div>
+              <canvas id="chartIncome" height="220"></canvas>
+            </div>
+            <div class="chart-card glass full-width">
+              <div class="chart-card-header">Daily Spending — Last 30 Days</div>
+              <canvas id="chartDaily" height="80"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── BUDGET VIEW ────────────────────────────── -->
+        <section class="view" id="view-budget">
+          <div class="section-header">
+            <h2 class="section-title">Budget Manager</h2>
+          </div>
+
+          <div class="budget-hero glass">
+            <div class="budget-hero-left">
+              <div class="form-label" style="margin-bottom:8px">Monthly Spending Limit (₹)</div>
+              <div class="budget-input-row">
+                <input class="form-input" id="budgetInput" type="number" placeholder="e.g. 30000" style="max-width:200px" />
+                <button class="btn btn-primary" id="saveBudgetBtn">Save</button>
+                <button class="btn btn-ghost btn-sm" id="clearBudgetBtn">Clear</button>
+              </div>
+            </div>
+            <div class="budget-hero-right" id="budgetGauge">
+              <div class="gauge-wrap">
+                <svg class="gauge-svg" viewBox="0 0 100 56">
+                  <path class="gauge-bg" d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke-width="8" stroke-linecap="round"/>
+                  <path class="gauge-fill" id="gaugeFill" d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke-width="8" stroke-linecap="round" stroke-dasharray="0 126"/>
+                </svg>
+                <div class="gauge-center">
+                  <div class="gauge-pct" id="gaugePct">0%</div>
+                  <div class="gauge-sub">used</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-header" style="margin-top:24px">
+            <h2 class="section-title">Category Breakdown — This Month</h2>
+          </div>
+          <div class="cat-breakdown" id="catBreakdown"></div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       ADD / EDIT TRANSACTION MODAL
+  ============================================================ -->
+  <div class="modal-overlay" id="txModal" role="dialog" aria-modal="true" aria-labelledby="modalHeading">
+    <div class="modal glass">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalHeading">Add Transaction</h3>
+        <button class="btn-icon modal-close" id="modalClose" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Type toggle -->
+        <div class="type-toggle" role="group" aria-label="Transaction type">
+          <button class="type-btn type-expense active" id="btnTypeExpense">📉 Expense</button>
+          <button class="type-btn type-income" id="btnTypeIncome">📈 Income</button>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label" for="txAmount">Amount (₹)</label>
+            <input class="form-input" id="txAmount" type="number" placeholder="0.00" min="0.01" step="0.01" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="txDate">Date</label>
+            <input class="form-input" id="txDate" type="date" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="txDesc">Description</label>
+          <input class="form-input" id="txDesc" type="text" placeholder="What was this for?" autocomplete="off" />
+          <div id="autoSuggest" class="auto-suggest hidden"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="txCat">Category</label>
+          <select class="form-select" id="txCat">
+            <option value="">Select category…</option>
+          </select>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modalCancel">Cancel</button>
+        <button class="btn btn-primary" id="modalSave">Save Transaction</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       TOAST CONTAINER
+  ============================================================ -->
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  <!-- ============================================================
+       SCRIPTS (modular, order matters)
+  ============================================================ -->
+  <script src="js/modules/config.js"></script>
+  <script src="js/modules/firebase.js"></script>
+  <script src="js/modules/store.js"></script>
+  <script src="js/modules/ui.js"></script>
+  <script src="js/modules/charts.js"></script>
+  <script src="js/modules/auth.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
